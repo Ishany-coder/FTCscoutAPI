@@ -13,7 +13,10 @@
 
     function determineMatchType(matchId) {
         if (matchId > 20000) {
-            return { matchType: "Playoff", matchNumber: (matchId - 20001)/1000 };
+            return { matchType: "Playoff", matchNumber: (matchId-20001)/1000 };
+        }
+        else if (matchId == 'N/A'){
+            return { matchType: "unknown", matchNumber: matchId };
         }
         return { matchType: "Qualification", matchNumber: matchId };
     }
@@ -46,72 +49,91 @@
     }
 
     async function fetchData1() {
-        console.log("fetching data1");
-        const query = `
-query{
-	teamByNumber(number:${teamNumber}){
-    events(season:2024){
-      matches{
-        matchId
-      }
-    }
-  }
-}
-        `;
-
-        try {
-            const response = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query }),
-            });
-
-            const json = await response.json();
-            data1 = json?.data?.teamByNumber?.events?.flatMap(event =>
-                event.matches.map(m => {
-                    const { matchType, matchNumber } = determineMatchType(m.matchId);
-                    return {
-                        matchId: m.matchId,
-                        matchType,
-                        matchNumber,
-                        eventName: event.name,
-                    };
-                })
-            ) || [];
-
-            console.log("Filtered Matches:", data1);
-        } catch (err) {
-            console.error("Error fetching data1:", err);
+    console.log("fetching data1");
+    const query = `
+    query {
+        teamByNumber(number: ${teamNumber}) {
+            events(season: 2024) {
+                matches {
+                    alliance
+                    matchId
+                }
+            }
         }
     }
+    `;
 
-    async function fetchData2() {
-        const query = `
-        query {
-            teamByNumber(number: ${teamNumber}) {
-                events(season: 2024) {
-                    matches {
-                        match {
-                            matchNum
-                            scores {
-                                ... on MatchScores2024 {
-                                    red {
-                                        eventCode
-                                        matchId
-                                        alliance
-                                        autoSampleHigh
-                                        autoSampleLow
-                                        autoSpecimenHigh
-                                        autoSpecimenLow
-                                        dcSampleHigh
-                                        dcSampleLow
-                                        dcSpecimenHigh
-                                        dcSpecimenLow
-                                        autoPoints
-                                        dcPoints
-                                        totalPoints
-                                        penaltyPointsCommitted
-                                    }
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+        });
+
+        const json = await response.json();
+
+        data1 = json?.data?.teamByNumber?.events?.flatMap(event =>
+            event.matches.map(m => {
+                const { matchType, matchNumber } = determineMatchType(m.matchId);
+                return {
+                    matchId: m.matchId,
+                    matchType,
+                    matchNumber,
+                    eventName: event.eventName || eventNames[event.eventCode] || "Unknown Event", // Properly map eventName
+                    alliance: m.alliance // ✅ Now correctly extracting alliance
+                };
+            })
+        ) || [];
+
+        console.log("Filtered Matches from Data1:", data1);
+    } catch (err) {
+        console.error("Error fetching data1:", err);
+    }
+}
+
+async function fetchData2() {
+    const query = `
+    query {
+        teamByNumber(number: ${teamNumber}) {
+            events(season: 2024) {
+                matches {
+                    match {
+                        matchNum
+                        scores {
+                            ... on MatchScores2024 {
+                                red {
+                                    eventCode
+                                    matchId
+                                    alliance
+                                    autoSampleHigh
+                                    autoSampleLow
+                                    autoSpecimenHigh
+                                    autoSpecimenLow
+                                    dcSampleHigh
+                                    dcSampleLow
+                                    dcSpecimenHigh
+                                    dcSpecimenLow
+                                    autoPoints
+                                    dcPoints
+                                    totalPoints
+                                    penaltyPointsCommitted
+                                }
+                                blue {
+                                    eventCode
+                                    matchId
+                                    alliance
+                                    autoSampleHigh
+                                    autoSampleLow
+                                    autoSpecimenHigh
+                                    autoSpecimenLow
+                                    dcSampleHigh
+                                    dcSampleLow
+                                    dcSpecimenHigh
+                                    dcSpecimenLow
+                                    autoPoints
+                                    dcPoints
+                                    totalPoints
+                                    penaltyPointsCommitted
                                 }
                             }
                         }
@@ -119,65 +141,102 @@ query{
                 }
             }
         }
-        `;
+    }
+    `;
 
-        try {
-            const response = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query }),
-            });
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+        });
 
-            const json = await response.json();
-            data2 = json?.data?.teamByNumber?.events?.flatMap(event =>
-                event.matches.map(m => {
-                    const scoreData = m.match.scores?.red;
-                    if (!scoreData) return null;
+        const json = await response.json();
+        console.log("Data2:", json);
 
-                    return {
-                        matchId: scoreData.matchId,
-                        eventCode: scoreData.eventCode || "N/A",
-                        alliance: scoreData.alliance || "Unknown",
-                        highBasket: scoreData.autoSampleHigh + scoreData.dcSampleHigh,
-                        lowBasket: scoreData.autoSampleLow + scoreData.dcSampleLow,
-                        highChamber: scoreData.autoSpecimenHigh + scoreData.dcSpecimenHigh,
-                        lowChamber: scoreData.autoSpecimenLow + scoreData.dcSpecimenLow,
-                        autoPoints: scoreData.autoPoints,
-                        dcPoints: scoreData.dcPoints,
-                        totalPoints: scoreData.totalPoints,
-                        penaltyPointsCommitted: scoreData.penaltyPointsCommitted,
-                    };
-                })
-            ).filter(Boolean) || [];
+        data2 = json?.data?.teamByNumber?.events?.flatMap(event =>
+            event.matches.flatMap(m => {
+                const redScore = m.match.scores?.red;
+                const blueScore = m.match.scores?.blue;
 
-            for (let match of data2) {
-                if (match.eventCode && match.eventCode !== "N/A") {
-                    await fetchEventName(match.eventCode);
-                }
+                // Extract both red and blue alliance data if available
+                return [
+                    redScore ? {
+                        matchId: redScore.matchId,
+                        eventCode: redScore.eventCode || "N/A",
+                        alliance: "Red",
+                        highBasket: (redScore.autoSampleHigh || 0) + (redScore.dcSampleHigh || 0),
+                        lowBasket: (redScore.autoSampleLow || 0) + (redScore.dcSampleLow || 0),
+                        highChamber: (redScore.autoSpecimenHigh || 0) + (redScore.dcSpecimenHigh || 0),
+                        lowChamber: (redScore.autoSpecimenLow || 0) + (redScore.dcSpecimenLow || 0),
+                        autoPoints: redScore.autoPoints || 0,
+                        dcPoints: redScore.dcPoints || 0,
+                        totalPoints: redScore.totalPoints || 0,
+                        penaltyPointsCommitted: redScore.penaltyPointsCommitted || 0,
+                    } : null,
+                    
+                    blueScore ? {
+                        matchId: blueScore.matchId,
+                        eventCode: blueScore.eventCode || "N/A",
+                        alliance: "Blue",
+                        highBasket: (blueScore.autoSampleHigh || 0) + (blueScore.dcSampleHigh || 0),
+                        lowBasket: (blueScore.autoSampleLow || 0) + (blueScore.dcSampleLow || 0),
+                        highChamber: (blueScore.autoSpecimenHigh || 0) + (blueScore.dcSpecimenHigh || 0),
+                        lowChamber: (blueScore.autoSpecimenLow || 0) + (blueScore.dcSpecimenLow || 0),
+                        autoPoints: blueScore.autoPoints || 0,
+                        dcPoints: blueScore.dcPoints || 0,
+                        totalPoints: blueScore.totalPoints || 0,
+                        penaltyPointsCommitted: blueScore.penaltyPointsCommitted || 0,
+                    } : null
+                ];
+            })
+        ).flat().filter(Boolean) || [];
+
+        for (let match of data2) {
+            if (match.eventCode && match.eventCode !== "N/A") {
+                await fetchEventName(match.eventCode);
             }
+        }
 
-            console.log("Filtered Scores:", data2);
-        } catch (err) {
-            console.error("Error fetching data2:", err);
+        console.log("Filtered Scores (Including Red & Blue):", data2);
+    } catch (err) {
+        console.error("Error fetching data2:", err);
+    }
+}
+
+ function mergeData() {
+    const matchMap = new Map();
+
+    // First, store all matches from data1
+    data1.forEach(match => {
+        matchMap.set(match.matchId, { ...match });
+    });
+
+    // Then merge with data2, ensuring the correct alliance is kept
+    for (const score of data2) {
+        let existingMatch = matchMap.get(score.matchId);
+
+        if (existingMatch) {
+            matchMap.set(score.matchId, { 
+                ...existingMatch, 
+                ...score,
+                alliance: existingMatch.alliance || score.alliance  // ✅ Keep `alliance` from data1 if available
+            });
+        } else {
+            matchMap.set(score.matchId, { 
+                matchId: score.matchId,
+                matchType: "Unknown",
+                matchNumber: "N/A",
+                eventCode: score.eventCode || null,
+                eventName: eventNames[score.eventCode] || null, 
+                ...score
+            });
         }
     }
 
-    function mergeData() {
-        const matchMap = new Map();
-
-        data1.forEach(match => {
-            matchMap.set(match.matchId, { ...match });
-        });
-
-        data2.forEach(score => {
-            if (matchMap.has(score.matchId)) {
-                matchMap.set(score.matchId, { ...matchMap.get(score.matchId), ...score });
-            }
-        });
-
-        mergedData = Array.from(matchMap.values());
-        console.log("Merged Data:", mergedData);
-    }
+    mergedData = Array.from(matchMap.values());
+    console.log("Merged Data:", mergedData);
+}
 
     async function fetchAllData() {
         loading = true;
@@ -256,20 +315,33 @@ query{
                     </tr>
                 </thead>
                 <tbody>
-                    {#each mergedData as match}
+                    {#each mergedData as match (match.matchId)}
                         <tr>
                             <td>{match.matchNumber}</td>
                             <td>{match.matchType}</td>
-                            <td>{eventNames[match.eventCode] || match.eventName}</td>
+                            <td>{match.eventCode ? eventNames[match.eventCode] : match.eventName}</td>
                             <td>{match.alliance}</td>
-                            <td>{match.highBasket}</td>
-                            <td>{match.lowBasket}</td>
-                            <td>{match.highChamber}</td>
-                            <td>{match.lowChamber}</td>
-                            <td>{match.autoPoints}</td>
-                            <td>{match.dcPoints}</td>
-                            <td>{match.totalPoints}</td>
-                            <td style="color: red;">{match.penaltyPointsCommitted}</td>
+            
+                            <!-- ✅ Check if the match is on Red or Blue alliance and display relevant data -->
+                            {#if match.alliance === "Red"}
+                                <td>{match.highBasket}</td>
+                                <td>{match.lowBasket}</td>
+                                <td>{match.highChamber}</td>
+                                <td>{match.lowChamber}</td>
+                                <td>{match.autoPoints}</td>
+                                <td>{match.dcPoints}</td>
+                                <td>{match.totalPoints}</td>
+                                <td style="color: red;">{match.penaltyPointsCommitted}</td>
+                            {:else if match.alliance === "Blue"}
+                                <td>{match.highBasket}</td>
+                                <td>{match.lowBasket}</td>
+                                <td>{match.highChamber}</td>
+                                <td>{match.lowChamber}</td>
+                                <td>{match.autoPoints}</td>
+                                <td>{match.dcPoints}</td>
+                                <td>{match.totalPoints}</td>
+                                <td style="color: blue;">{match.penaltyPointsCommitted}</td>
+                            {/if}
                         </tr>
                     {/each}
                 </tbody>
