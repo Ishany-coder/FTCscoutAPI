@@ -18,5 +18,10 @@
 		"svelte": "^5.0.0",
 		"tailwindcss": "^4.0.7",
 		"vite": "^6.0.0"
+	},
+	"dependencies": {
+		"googleapi": "^1.0.2",
+		"googleapis": "^144.0.0",
+		"xlsx": "^0.18.5"
 	}
 }

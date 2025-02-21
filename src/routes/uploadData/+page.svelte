@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import * as XLSX from "xlsx";
 
     let teamNumber = 23270; // Default team number
     let data1 = [];
@@ -69,6 +70,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ query }),
         });
+        console.log("Data1:", response);
 
         const json = await response.json();
 
@@ -235,7 +237,42 @@ async function fetchData2() {
     }
 
     mergedData = Array.from(matchMap.values());
-    console.log("Merged Data:", mergedData);
+    const headers = [
+        ["Match #", "Match Type", "Event Name", "Alliance", 
+         "High Basket", "Low Basket", "High Chamber", "Low Chamber", 
+         "Auto Score", "Teleop Score", "Total Points", "Penalties"]
+    ];
+
+    // Prepare data for the Excel sheet
+    const formattedData = [];
+
+    mergedData.forEach(match => {
+        // Push match data into the formatted data array
+        formattedData.push([
+            match.matchNumber || "N/A",
+            match.matchType || "N/A",
+            match.eventCode ? eventNames[match.eventCode] : match.eventName,
+            match.alliance || "N/A",
+            match.highBasket || 0,
+            match.lowBasket || 0,
+            match.highChamber || 0,
+            match.lowChamber || 0,
+            match.autoPoints || 0,
+            match.dcPoints || 0,
+            match.totalPoints || 0,
+            match.penaltyPointsCommitted || 0
+        ]);
+    });
+
+    // Create worksheet and workbook
+    const worksheet = XLSX.utils.aoa_to_sheet([...headers, ...formattedData]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Match Data");
+
+    // Generate file
+    XLSX.writeFile(workbook, "match_data.xlsx");
+
+    console.log("✅ Excel file generated: match_data.xlsx");
 }
 
     async function fetchAllData() {
