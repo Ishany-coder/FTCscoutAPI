@@ -8,7 +8,22 @@
   
     const API_URL = "https://api.ftcscout.org/graphql";
   
-    async function fetchData() {
+    function determineMatchType(matchId) {
+      const matchIdStr = matchId.toString();
+      let matchType, matchNumber;
+  
+      if (matchIdStr.length > 4) {
+        matchType = "Playoff";
+        matchNumber = matchIdStr[1]; // ✅ Extract the **second** digit as the Playoff match number
+      } else {
+        matchType = "Qualification";
+        matchNumber = matchId;
+      }
+  
+      return { matchType, matchNumber };
+    }
+  
+    async function fetchMatches() {
       loading = true;
       error = null;
       data = [];
@@ -18,22 +33,7 @@
           teamByNumber(number: ${teamNumber}) {
             events(season: 2024) {
               matches {
-                match {
-                  scores {
-                    ... on MatchScores2024 {
-                      red {
-                        season
-                        eventCode
-                        matchId
-                        alliance
-                        autoPoints
-                        dcPoints
-                        totalPoints
-                        penaltyPointsCommitted
-                      }
-                    }
-                  }
-                }
+                matchId
               }
             }
           }
@@ -47,12 +47,22 @@
           body: JSON.stringify({ query }),
         });
   
-        const json = await response.json();
-        data = json.data?.teamByNumber?.events?.flatMap(event =>
-          event.matches.map(m => m.match.scores?.red)
-        ).filter(Boolean) || [];
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
   
-        console.log("Filtered Match Scores:", data);
+        const json = await response.json();
+  
+        data = json?.data?.teamByNumber?.events?.flatMap(event =>
+          event.matches.map(m => {
+            const { matchType, matchNumber } = determineMatchType(m.matchId);
+            return {
+              matchId: m.matchId,
+              matchType,
+              matchNumber,
+            };
+          })
+        ) || [];
+  
+        console.log("Filtered Matches:", data);
   
       } catch (err) {
         error = err.message;
@@ -62,12 +72,12 @@
       }
     }
   
-    onMount(fetchData);
+    onMount(fetchMatches);
   </script>
   
   <style>
     .container {
-      max-width: 800px;
+      max-width: 600px;
       margin: 20px auto;
       padding: 20px;
       border: 1px solid #ddd;
@@ -130,7 +140,7 @@
   </style>
   
   <div class="container">
-    <h1>FTC Scout Match Scores</h1>
+    <h1>FTC Matches</h1>
   
     <div class="input-group">
       <input
@@ -138,7 +148,7 @@
         bind:value={teamNumber}
         placeholder="Enter Team #"
       />
-      <button on:click={fetchData}>Get Data</button>
+      <button on:click={fetchMatches}>Get Data</button>
     </div>
   
     {#if loading}
@@ -146,31 +156,23 @@
     {:else if error}
       <p class="error">Error: {error}</p>
     {:else if data.length === 0}
-      <p class="loading">No match data found for Team {teamNumber}.</p>
+      <p class="loading">No matches found for Team {teamNumber}.</p>
     {:else}
       <div class="table-container">
         <table>
           <thead>
             <tr>
               <th>Match ID</th>
-              <th>Event Code</th>
-              <th>Alliance</th>
-              <th>Auto Points</th>
-              <th>Driver-Controlled Points</th>
-              <th>Total Points</th>
-              <th>Penalties</th>
+              <th>Match Type</th>
+              <th>Match Number</th>
             </tr>
           </thead>
           <tbody>
-            {#each data as score, index}
+            {#each data as match, index}
               <tr>
-                <td>{score.matchId}</td>
-                <td>{score.eventCode}</td>
-                <td>{score.alliance}</td>
-                <td>{score.autoPoints}</td>
-                <td>{score.dcPoints}</td>
-                <td><strong>{score.totalPoints}</strong></td>
-                <td style="color: red;">{score.penaltyPointsCommitted}</td>
+                <td>{match.matchId}</td>
+                <td>{match.matchType}</td>
+                <td>{match.matchNumber}</td>
               </tr>
             {/each}
           </tbody>
