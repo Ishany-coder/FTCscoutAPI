@@ -34,9 +34,6 @@
 
     function determineMatchTypeAndNumber(matchId) {
         if (matchId > 20000) {
-            console.log("got MatchID > 20000", matchId);
-            let matchNumber = (matchId - 20001) / 1000;
-            console.log("matchNumber", matchNumber);
             return { matchType: "Playoff", matchNumber: (matchId - 20001) / 1000 };
         }
         return { matchType: "Qualification", matchNumber: matchId };
@@ -150,8 +147,6 @@
 
                     const matchScore = m.match.scores[teamAlliance.toLowerCase()] || {}; // ✅ Get only correct alliance score
                     const { matchType, matchNumber } = determineMatchTypeAndNumber(matchScore.matchId);
-                    console.log("match number", matchNumber);
-                    console.log("MatchType", matchType);
                     const eventName = matchScore.eventCode ? await fetchEventName(matchScore.eventCode) : "Unknown Event"; // ✅ Fetch event name
 
                     return matchScore.matchId ? [
