@@ -20,8 +20,15 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
+		"@ai-sdk/openai": "^1.1.13",
+		"@ai-sdk/svelte": "^1.1.18",
+		"ai": "^4.1.45",
+		"axios": "^1.7.9",
+		"dotenv": "^16.4.7",
 		"googleapi": "^1.0.2",
 		"googleapis": "^144.0.0",
-		"xlsx": "^0.18.5"
+		"openai": "^4.85.3",
+		"xlsx": "^0.18.5",
+		"zod": "^3.24.2"
 	}
 }
