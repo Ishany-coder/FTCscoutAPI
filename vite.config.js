@@ -3,10 +3,4 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [sveltekit()],
-	optimizeDeps: {
-		include: ['googleapis'],
-	},
-	ssr: {
-		noExternal: ['googleapis']
-	}
 });
